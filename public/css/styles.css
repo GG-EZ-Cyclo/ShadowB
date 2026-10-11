@@ -1,0 +1,34 @@
+:root{color-scheme:dark;--gold:#edcf86;--panel:#161d32;--muted:#aab5d5}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(ellipse at top,#303b68,#0b0e19 75%);color:#f6f4ff;font-family:system-ui,sans-serif}
+header{padding:16px 5%;background:#080b16cc;border-bottom:1px solid #ffffff20;display:flex;justify-content:space-between;gap:12px;align-items:center}
+.logo{font-size:22px;font-weight:900;letter-spacing:3px;color:var(--gold)}
+main{max-width:1000px;margin:auto;padding:18px}
+.panel{background:#141a2ceF;border:1px solid #ffffff24;border-radius:15px;padding:14px;margin-bottom:14px}
+input{background:#0b1020;border:1px solid #526080;border-radius:8px;color:white;padding:10px;max-width:100%;width:180px}
+button{cursor:pointer;color:white;background:#303c60;border:1px solid #68779c;border-radius:8px;padding:9px 12px;font:inherit}
+button:hover:not(:disabled){filter:brightness(1.2)}
+button:disabled{opacity:.4;cursor:not-allowed}
+.gold{background:linear-gradient(100deg,#f6df9f,#c69a45);color:#21192a;border:0;font-weight:800}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.small{font-size:12px;color:var(--muted)}
+.hp{color:#ff9fb6;font-size:22px;font-weight:900}
+.mana{color:#91d7ff;font-weight:800}
+.field,.hand{display:flex;justify-content:center;align-items:stretch;gap:9px;flex-wrap:wrap;padding:13px 0;min-height:100px}
+.hand{justify-content:flex-start;overflow-x:auto;flex-wrap:nowrap;min-height:185px}
+.card{position:relative;display:flex;flex-direction:column;justify-content:space-between;text-align:left;flex:0 0 125px;min-height:160px;background:linear-gradient(155deg,#35466e,#171f37 75%);border:1px solid #6d7fa5;border-radius:11px;padding:9px;white-space:normal}
+.card.selected{outline:3px solid #ffe18c}
+.card.ready{border-color:#8ce9c4}
+.card .cost{position:absolute;left:-5px;top:-6px;background:#277fc4;border:2px solid #b8e6ff;border-radius:50%;width:26px;height:26px;display:grid;place-items:center;font-weight:900}
+.art{font-size:34px;text-align:center;padding:7px;background:radial-gradient(circle,#536799,#1b2542);border-radius:7px}
+.name{font-size:12px;font-weight:900;margin:5px 0}
+.desc{font-size:10px;color:#cad4ec;line-height:1.4}
+.stats{display:flex;justify-content:space-between;font-weight:900;margin-top:5px}
+.atk{color:#ffc07b}.def{color:#a6f2c3}
+.card-actions{display:flex;gap:4px;margin-top:6px}
+.card-actions button{font-size:11px;padding:5px;flex:1}
+hr{border:0;border-top:1px solid #ffffff1b;margin:12px 0}
+#notice{color:var(--gold);min-height:22px}
+#logs{font-size:12px;line-height:1.8;color:#b7c2df}
+#roomCode{font-size:20px;font-weight:900;letter-spacing:4px;color:var(--gold)}
+@media(max-width:500px){main{padding:9px}.panel{padding:10px}.card{flex-basis:112px;min-height:154px}}
