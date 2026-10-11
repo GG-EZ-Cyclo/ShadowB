@@ -1,0 +1,288 @@
+
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ECLIPSE DUEL</title>
+<script src="/socket.io/socket.io.js"></script>
+<style>
+:root{color-scheme:dark;--gold:#edcf86;--panel:#161d32;--muted:#aab5d5}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(ellipse at top,#303b68,#0b0e19 75%);color:#f6f4ff;font-family:system-ui,sans-serif}
+header{padding:16px 5%;background:#080b16cc;border-bottom:1px solid #ffffff20;display:flex;justify-content:space-between;gap:12px;align-items:center}
+.logo{font-size:22px;font-weight:900;letter-spacing:3px;color:var(--gold)}
+main{max-width:1000px;margin:auto;padding:18px}
+.panel{background:#141a2ceF;border:1px solid #ffffff24;border-radius:15px;padding:14px;margin-bottom:14px}
+input{background:#0b1020;border:1px solid #526080;border-radius:8px;color:white;padding:10px;max-width:100%;width:180px}
+button{cursor:pointer;color:white;background:#303c60;border:1px solid #68779c;border-radius:8px;padding:9px 12px;font:inherit}
+button:hover:not(:disabled){filter:brightness(1.2)}
+button:disabled{opacity:.4;cursor:not-allowed}
+.gold{background:linear-gradient(100deg,#f6df9f,#c69a45);color:#21192a;border:0;font-weight:800}
+.row{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.small{font-size:12px;color:var(--muted)}
+.hp{color:#ff9fb6;font-size:22px;font-weight:900}
+.mana{color:#91d7ff;font-weight:800}
+.field,.hand{display:flex;justify-content:center;align-items:stretch;gap:9px;flex-wrap:wrap;padding:13px 0;min-height:100px}
+.hand{justify-content:flex-start;overflow-x:auto;flex-wrap:nowrap;min-height:185px}
+.card{position:relative;display:flex;flex-direction:column;justify-content:space-between;text-align:left;flex:0 0 125px;min-height:160px;background:linear-gradient(155deg,#35466e,#171f37 75%);border:1px solid #6d7fa5;border-radius:11px;padding:9px;white-space:normal}
+.card.selected{outline:3px solid #ffe18c}
+.card.ready{border-color:#8ce9c4}
+.card .cost{position:absolute;left:-5px;top:-6px;background:#277fc4;border:2px solid #b8e6ff;border-radius:50%;width:26px;height:26px;display:grid;place-items:center;font-weight:900}
+.art{font-size:34px;text-align:center;padding:7px;background:radial-gradient(circle,#536799,#1b2542);border-radius:7px}
+.name{font-size:12px;font-weight:900;margin:5px 0}
+.desc{font-size:10px;color:#cad4ec;line-height:1.4}
+.stats{display:flex;justify-content:space-between;font-weight:900;margin-top:5px}
+.atk{color:#ffc07b}.def{color:#a6f2c3}
+.card-actions{display:flex;gap:4px;margin-top:6px}
+.card-actions button{font-size:11px;padding:5px;flex:1}
+hr{border:0;border-top:1px solid #ffffff1b;margin:12px 0}
+#notice{color:var(--gold);min-height:22px}
+#logs{font-size:12px;line-height:1.8;color:#b7c2df}
+#roomCode{font-size:20px;font-weight:900;letter-spacing:4px;color:var(--gold)}
+@media(max-width:500px){main{padding:9px}.panel{padding:10px}.card{flex-basis:112px;min-height:154px}}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <div class="logo">ECLIPSE DUEL</div>
+    <div class="small">FANTASY CARD BATTLE</div>
+  </div>
+  <div class="small" id="connection">接続中...</div>
+</header>
+
+<main>
+  <section class="panel" id="lobby">
+    <h3>友達と対戦する</h3>
+    <div class="row">
+      <label>プレイヤー名<br><input id="name" maxlength="16" value="星詠みの旅人"></label>
+      <button class="gold" onclick="createRoom()">ルームを作る</button>
+    </div>
+    <hr>
+    <div class="row">
+      <label>ルームコード<br><input id="code" maxlength="6" placeholder="例：A1B2C3"></label>
+      <button onclick="joinRoom()">ルームに参加</button>
+    </div>
+    <p class="small">ホストがルームを作成し、表示されたコードを友達に共有してください。</p>
+  </section>
+
+  <section class="panel">
+    <div class="row">
+      <div><span class="small">ROOM CODE</span><div id="roomCode">------</div></div>
+      <div id="turn" class="small">対戦相手を待っています</div>
+    </div>
+    <p id="notice">ルームを作成するか、友達のルームに参加してください。</p>
+  </section>
+
+  <section class="panel">
+    <div class="row">
+      <div>
+        <div class="small">ENEMY LEADER</div>
+        <strong id="enemyName">対戦相手</strong>
+        <div class="hp" id="enemyHp">-- HP</div>
+      </div>
+      <div class="mana" id="enemyMana">マナ --</div>
+      <div class="small" id="enemyHand">手札 -- 枚</div>
+    </div>
+    <hr>
+    <div class="small">ENEMY FIELD</div>
+    <div id="enemyField" class="field"></div>
+    <hr>
+    <div class="small">YOUR FIELD</div>
+    <div id="myField" class="field"></div>
+    <div class="row">
+      <div>
+        <div class="small">YOUR LEADER</div>
+        <strong id="myName">あなた</strong>
+        <div class="hp" id="myHp">20 HP</div>
+      </div>
+      <div>
+        <div class="mana" id="myMana">マナ 0 / 0</div>
+        <div class="small" id="myEvo">進化 2</div>
+      </div>
+    </div>
+    <div class="row" style="justify-content:center;margin-top:12px">
+      <button onclick="cancelAttack()">選択解除</button>
+      <button class="gold" id="end" onclick="endTurn()">ターン終了 ➜</button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="row"><h3>YOUR HAND</h3><span class="small" id="deckCount"></span></div>
+    <div id="hand" class="hand"></div>
+    <p class="small">カードを出すにはカードをクリック。攻撃するには自分のフォロワーを選び、対象をクリックします。</p>
+  </section>
+
+  <section class="panel">
+    <div class="small">BATTLE LOG</div>
+    <div id="logs">戦いの記録がここに表示されます。</div>
+  </section>
+</main>
+
+<script>
+const socket = io();
+let game = null;
+let attackerId = null;
+let lastNotice = "";
+
+const $ = id => document.getElementById(id);
+const esc = value => String(value ?? "").replace(/[&<>"']/g, c => ({
+  "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+}[c]));
+
+socket.on("connect", () => $("connection").textContent = "サーバー接続済み");
+socket.on("disconnect", () => $("connection").textContent = "接続が切れました");
+socket.on("connect_error", () => $("connection").textContent = "接続エラー");
+
+socket.on("roomCreated", code => {
+  $("code").value = code;
+  $("roomCode").textContent = code;
+  $("notice").textContent = "友達にルームコードを共有してください。";
+});
+
+socket.on("notice", message => {
+  lastNotice = message;
+  $("notice").textContent = message;
+});
+
+socket.on("state", state => {
+  game = state;
+  attackerId = null;
+  render();
+});
+
+function createRoom() {
+  socket.emit("createRoom", {name:$("name").value.trim() || "旅人"});
+}
+
+function joinRoom() {
+  socket.emit("joinRoom", {
+    code:$("code").value.trim(),
+    name:$("name").value.trim() || "旅人"
+  });
+}
+
+function myTurn() {
+  return game && game.started && !game.over &&
+    game.active === game.myIndex;
+}
+
+function cardMarkup(card, side, index) {
+  const isFollower = card.type === "follower";
+  const selected = side === "me" && card.id === attackerId;
+  const ready = isFollower && card.canAttack;
+  const description = card.effect === "heal" ? "召喚時：自分を2回復"
+    : card.effect === "heal3" ? "召喚時：自分を3回復"
+    : card.effect === "blast" ? "召喚時：敵リーダーに2ダメージ"
+    : card.effect === "bolt" ? "敵フォロワーに3ダメージ"
+    : card.effect === "heal4" ? "自分を4回復"
+    : card.effect === "meteor" ? "敵リーダーに4ダメージ"
+    : card.effect === "draw" ? "カードを2枚引く"
+    : "ファンタジーの力を解き放て！";
+
+  return `<div class="card ${selected?"selected":""} ${ready?"ready":""}">
+    <span class="cost">${card.cost}</span>
+    <div class="art">${esc(card.icon)}</div>
+    <div class="name">${esc(card.name)}${card.evolved?" ✨":""}</div>
+    <div class="desc">${esc(description)}</div>
+    ${isFollower?`<div class="stats"><span class="atk">⚔ ${card.atk}</span><span class="def">♥ ${card.hp}</span></div>`:""}
+    ${side==="me" && isFollower ? `<div class="card-actions">
+      <button ${!myTurn()||!ready?"disabled":""} onclick="selectAttacker('${card.id}')">攻撃</button>
+      <button ${!myTurn()||!game||game.me.evo<=0||game.me.turns<2||card.evolved?"disabled":""} onclick="evolve('${card.id}')">進化</button>
+    </div>`:""}
+    ${side==="enemy" && attackerId ? `<div class="card-actions"><button onclick="attack('${card.id}')">攻撃対象</button></div>`:""}
+  </div>`;
+}
+
+function render() {
+  if (!game) return;
+
+  $("roomCode").textContent = game.code;
+  $("lobby").style.display = game.started ? "none" : "block";
+  $("turn").textContent = !game.started ? "対戦相手を待っています"
+    : game.over ? "対戦終了"
+    : myTurn() ? `TURN ${game.turn} · あなたのターン`
+    : `TURN ${game.turn} · 相手のターン`;
+
+  $("myName").textContent = game.me.name;
+  $("myHp").textContent = game.me.hp + " HP";
+  $("myMana").textContent = `マナ ${game.me.mana} / ${game.me.maxMana}`;
+  $("myEvo").textContent = `進化ポイント ${game.me.evo}`;
+  $("deckCount").textContent = `デッキ残り ${game.me.deckCount} 枚`;
+
+  $("enemyName").textContent = game.enemy?.name || "対戦相手を待っています";
+  $("enemyHp").textContent = game.enemy ? game.enemy.hp + " HP" : "-- HP";
+  $("enemyMana").textContent = game.enemy
+    ? `マナ ${game.enemy.mana} / ${game.enemy.maxMana}` : "マナ --";
+  $("enemyHand").textContent = game.enemy
+    ? `手札 ${game.enemy.handCount} 枚` : "手札 -- 枚";
+
+  $("myField").innerHTML = game.me.field.length
+    ? game.me.field.map(c => cardMarkup(c,"me")).join("")
+    : '<span class="small">フォロワーがいません</span>';
+
+  $("enemyField").innerHTML = game.enemy?.field.length
+    ? game.enemy.field.map(c => cardMarkup(c,"enemy")).join("")
+    : '<span class="small">敵フォロワーがいません</span>';
+
+  $("hand").innerHTML = game.me.hand.map((c,i) => `
+    <button class="card" onclick="playCard(${i})"
+      ${!myTurn()||c.cost>game.me.mana?"disabled":""}>
+      <span class="cost">${c.cost}</span>
+      <div class="art">${esc(c.icon)}</div>
+      <div class="name">${esc(c.name)}</div>
+      <div class="desc">${esc(c.type==="spell"?"スペル":"フォロワー")}</div>
+      ${c.type==="follower"?`<div class="stats"><span class="atk">⚔ ${c.atk}</span><span class="def">♥ ${c.hp}</span></div>`:""}
+    </button>`).join("");
+
+  $("logs").innerHTML = game.logs.map(x => `<div>${esc(x)}</div>`).join("");
+  $("end").disabled = !myTurn();
+
+  if (game.over) {
+    $("notice").textContent = game.winner === -1 ? "引き分け！"
+      : game.winner === game.myIndex ? "勝利！ おめでとう！" : "敗北……再戦しよう！";
+  } else if (game.started) {
+    $("notice").textContent = myTurn()
+      ? "あなたのターンです。戦略を立てよう！"
+      : "相手の行動を待っています。";
+  }
+}
+
+function playCard(index) {
+  if (myTurn()) socket.emit("playCard", {index});
+}
+function selectAttacker(id) {
+  if (!myTurn()) return;
+  const card = game.me.field.find(c => c.id === id);
+  if (!card?.canAttack) return;
+  attackerId = id;
+  $("notice").textContent = "攻撃先を選択してください。";
+  render();
+}
+function attack(targetId) {
+  if (!myTurn() || !attackerId) return;
+  socket.emit("attack", {attackerId, targetId});
+  attackerId = null;
+}
+function evolve(cardId) {
+  if (myTurn()) socket.emit("evolve", {cardId});
+}
+function endTurn() {
+  attackerId = null;
+  if (myTurn()) socket.emit("endTurn");
+}
+function cancelAttack() {
+  attackerId = null;
+  render();
+}
+
+$("enemyHp").parentElement.style.cursor = "pointer";
+$("enemyHp").parentElement.onclick = () => {
+  if (attackerId && game?.enemy?.field.length === 0) attack("leader");
+};
+
+render();
+</script>
+</body>
+</html>
