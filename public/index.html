@@ -4,7 +4,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ECLIPSE DUEL</title>
+<title>ShadowVerse NEO</title>
 <script src="/socket.io/socket.io.js"></script>
 <link rel="stylesheet" href="/css/styles.css">
 </head>
@@ -73,7 +73,10 @@
           <div class="hp" id="enemyHp">-- HP</div>
           <button id="enemyLeaderTarget" class="small-target" style="display:none; margin-top:8px;" type="button">敵リーダーへ攻撃</button>
         </div>
-        <div class="mana" id="enemyMana">マナ --</div>
+        <div>
+          <div class="mana" id="enemyMana">マナ --</div>
+          <div class="small" id="enemyEvo">進化 0</div>
+        </div>
         <div class="small" id="enemyHand">手札 -- 枚</div>
       </div>
       <hr>
@@ -106,7 +109,11 @@
   </div>
 
   <section id="handArea" class="panel">
-    <div class="row"><h3>YOUR HAND</h3><span class="small" id="deckCount"></span></div>
+    <div class="row">
+      <h3>YOUR HAND</h3>
+      <span class="small" id="myHandCount">手札 0 枚</span>
+      <span class="small" id="deckCount"></span>
+    </div>
     <div id="hand" class="hand"></div>
     <p class="small">カードを選ぶと効果の確認が右側に表示されます。確認後、使用ボタンで実行します。</p>
   </section>
@@ -121,6 +128,6 @@
     <div id="postGameStatus" class="small" style="margin-top:8px;"></div>
   </section>
 </main>
-<script src="/js/app.js" defer></script>
+<script type="module" src="/js/app.js"></script>
 </body>
 </html>

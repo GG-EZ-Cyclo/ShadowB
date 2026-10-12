@@ -31,7 +31,7 @@ function applyFollowerSummonEffect(card, player, enemy) {
   }
 }
 
-function applySpellEffect(card, player, enemy) {
+function applySpellEffect(card, player, enemy, target = null) {
   if (!card || !card.effect) return;
 
   if (card.effect === 'heal4') {
@@ -46,6 +46,24 @@ function applySpellEffect(card, player, enemy) {
 
   if (card.effect === 'demon-hand') {
     enemy.field = applyDamageToField(enemy.field, 4);
+    return;
+  }
+
+  if (card.effect === 'angel-snipe') {
+    if (!target) return;
+    if (target === 'leader') {
+      enemy.hp = Math.max(0, enemy.hp - 1);
+      return;
+    }
+    target.hp -= 1;
+    return;
+  }
+
+  if (card.effect === 'death-dance') {
+    if (!target) return;
+    target.hp = 0;
+    enemy.field = enemy.field.filter(f => f.hp > 0);
+    enemy.hp = Math.max(0, enemy.hp - 2);
     return;
   }
 }

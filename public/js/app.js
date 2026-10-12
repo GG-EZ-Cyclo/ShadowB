@@ -1,19 +1,5 @@
-const CARD_LIBRARY = [
-  { id: "star-swordsman", name: "星屑の剣士", cost: 1, atk: 2, hp: 2, icon: "⚔️", image: "/images/cards/sord_man.png", type: "follower" },
-  { id: "forest-guardian", name: "森の守護者", cost: 2, atk: 2, hp: 4, icon: "🌿", image: "/images/cards/elf.jpeg", type: "follower" },
-  { id: "moon-priestess", name: "月光の巫女", cost: 2, atk: 1, hp: 3, icon: "🌙", image: "/images/cards/miko.jpeg", type: "follower", effect: "heal" },
-  { id: "flame-drake", name: "炎竜の幼体", cost: 3, atk: 4, hp: 3, icon: "🐉", image: "/images/cards/baby_doragon.png", type: "follower" },
-  { id: "heaven-knight", name: "蒼天の騎士", cost: 4, atk: 4, hp: 4, icon: "🛡️", image: "/images/cards/night.jpeg", type: "follower" },
-  { id: "abyss-mage", name: "深淵の魔術師", cost: 5, atk: 3, hp: 5, icon: "🔮", image: "/images/cards/witch.jpeg", type: "follower", effect: "blast" },
-  { id: "ancient-giant", name: "古代の巨人", cost: 6, atk: 6, hp: 7, icon: "🗿", image: "/images/cards/titan.jpeg", type: "follower" },
-  { id: "thunder-strike", name: "雷撃", cost: 2, icon: "⚡", image: "/images/cards/lightning.jpeg", type: "spell", effect: "bolt" },
-  { id: "healing-light", name: "癒やしの光", cost: 2, icon: "✨", image: "/images/cards/heal_light.jpeg", type: "spell", effect: "heal4" },
-  { id: "meteor-fall", name: "流星群", cost: 4, icon: "☄️", image: "/images/cards/meteo.png", type: "spell", effect: "meteor" },
-  { id: "soul-pact", name: "魂の契約", cost: 3, icon: "💠", image: "/images/cards/drow.jpeg", type: "spell", effect: "draw" },
-  { id: "awakening-dragon", name: "覚醒の竜", cost: 7, atk: 7, hp: 7, icon: "🐲", image: "/images/cards/dragon.jpeg", type: "follower", effect: "heal3" },
-  { id: "zeus", name: "ゼウス", cost: 10, atk: 10, hp: 10, icon: "⚡", image: "/images/cards/zeus.jpg", type: "follower", effect: "zeus" },
-  { id: "demon_hand", name: "大悪魔の腕", cost: 6, icon: "👿", image: "/images/cards/demon_hand.jpg", type: "spell", effect: "demon-hand" }
-];
+import { audioManager } from "./audio.js";
+import { CARD_LIBRARY, getDeckArray } from "./deckState.js";
 
 const socket = io();
 let game = null;
@@ -21,6 +7,7 @@ let attackerId = null;
 let lastNotice = "";
 let selectedDeck = {};
 let selectedCardPreviewIndex = null;
+let pendingSpellTarget = null;
 let forcedHomeNotice = "";
 
 const $ = id => document.getElementById(id);
@@ -28,57 +15,11 @@ const esc = value => String(value ?? "").replace(/[&<>\"']/g, c => ({
   "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
 }[c]));
 
-const audioManager = (() => {
-  const homeBgm = new Audio("/audio/homeBGM1.mp3");
-  const battleBgm = new Audio("/audio/BattleBGM(Lowen).mp3");
-  let unlocked = false;
-  let active = "home";
+window.addEventListener("pointerdown", () => audioManager.unlock(), { once: true });
+window.addEventListener("keydown", () => audioManager.unlock(), { once: true });
 
-  [homeBgm, battleBgm].forEach(audio => {
-    audio.loop = true;
-    audio.preload = "auto";
-    audio.volume = 0.25;
-  });
-
-  function unlock() {
-    if (unlocked) return;
-    unlocked = true;
-    setBgm(active);
-  }
-
-  function setBgm(mode) {
-    active = mode;
-    const target = mode === "battle" ? battleBgm : homeBgm;
-    [homeBgm, battleBgm].forEach(audio => {
-      if (audio !== target) {
-        audio.pause();
-        audio.currentTime = 0;
-      }
-    });
-
-    if (!unlocked) return;
-    target.play().catch(() => {});
-  }
-
-  function playEffect(path, volume = 0.6) {
-    const audio = new Audio(path);
-    audio.volume = volume;
-    audio.preload = "auto";
-    audio.play().catch(() => {});
-  }
-
-  return { unlock, setBgm, playEffect };
-})();
-
-window.addEventListener("pointerdown", audioManager.unlock, { once: true });
-window.addEventListener("keydown", audioManager.unlock, { once: true });
-
-function getDeckArray() {
-  const result = [];
-  Object.entries(selectedDeck).forEach(([cardId, count]) => {
-    for (let i = 0; i < count; i++) result.push(cardId);
-  });
-  return result;
+function getSelectedDeckArray() {
+  return getDeckArray(selectedDeck);
 }
 
 function setSelectedDeckFromServer(deck) {
@@ -90,11 +31,12 @@ function setSelectedDeckFromServer(deck) {
 }
 
 function addCard(cardId) {
-  const total = getDeckArray().length;
+  const total = getSelectedDeckArray().length;
   if (total >= 20) return;
   const current = selectedDeck[cardId] || 0;
   if (current >= 2) return;
   selectedDeck[cardId] = current + 1;
+  audioManager.playEffect("/audio/cardtap1.mp3", 0.45);
   renderDeckBuilder();
 }
 
@@ -103,11 +45,12 @@ function removeCard(cardId) {
   if (current <= 0) return;
   selectedDeck[cardId] = current - 1;
   if (selectedDeck[cardId] === 0) delete selectedDeck[cardId];
+  audioManager.playEffect("/audio/cardtap1.mp3", 0.45);
   renderDeckBuilder();
 }
 
 function renderDeckBuilder() {
-  const deck = getDeckArray();
+  const deck = getDeckArray(selectedDeck);
   const selfReady = Boolean(game?.me?.deckReady);
   const enemyReady = Boolean(game?.enemy?.deckReady);
 
@@ -142,7 +85,7 @@ function renderDeckBuilder() {
 }
 
 function submitDeck() {
-  const deck = getDeckArray();
+  const deck = getDeckArray(selectedDeck);
   if (deck.length !== 20) {
     $("notice").textContent = "デッキは20枚で組んでください。";
     return;
@@ -187,14 +130,40 @@ socket.on("state", state => {
     audioManager.setBgm("home");
   }
 
-  if (game?.phase === "deck-building" && !game.started) {
-    selectedDeck = {};
+  if (game?.phase === "deck-building" && !game.started && !game.me?.deckReady) {
     renderDeckBuilder();
   } else if (game?.me?.deckReady) {
-    setSelectedDeckFromServer(game.me.deckSelection || getDeckArray());
+    setSelectedDeckFromServer(game.me.deckSelection || getDeckArray(selectedDeck));
   }
 
   render();
+});
+
+socket.on("sound", ({ kind } = {}) => {
+  const soundMap = {
+    summonSound: "/audio/cardput1.mp3",
+    cardtap: "/audio/cardtap1.mp3",
+    dengekiAttack: "/audio/dagekiAttack1.mp3",
+    LifeDamege: "/audio/LifeDamege1.mp3",
+    SordAttack: "/audio/sordAttack1.mp3",
+    spellcard: "/audio/spellcard1.mp3",
+    syoukan: "/audio/syoukan1.mp3",
+    heal: "/audio/syoukan1.mp3",
+    victory: "/audio/syoukan1.mp3",
+    victry: "/audio/syoukan1.mp3",
+    defeat: "/audio/LifeDamege1.mp3",
+    evolve: "/audio/evolve1.mp3",
+    summon: "/audio/cardput1.mp3",
+    attack: "/audio/dagekiAttack1.mp3",
+    spell: "/audio/spellcard1.mp3",
+    turn: "/audio/cardtap1.mp3"
+  };
+
+  const file = soundMap[kind];
+  if (file) {
+    const volume = ["LifeDamege", "SordAttack", "dengekiAttack", "attack"].includes(kind) ? 0.8 : 0.6;
+    audioManager.playEffect(file, volume);
+  }
 });
 
 socket.on("roomLeft", ({ message, self = false } = {}) => {
@@ -238,6 +207,7 @@ function showHomeScreen(message = "ルームを作成するか、友達のルー
   attackerId = null;
   selectedDeck = {};
   selectedCardPreviewIndex = null;
+  pendingSpellTarget = null;
   forcedHomeNotice = message;
   if ($("lobby")) $("lobby").style.display = "block";
   if ($("deckBuilder")) $("deckBuilder").style.display = "none";
@@ -269,6 +239,9 @@ function cardMarkup(card, side) {
     : card.effect === "heal4" ? "自分を4回復"
     : card.effect === "meteor" ? "敵リーダーに4ダメージ"
     : card.effect === "draw" ? "カードを2枚引く"
+    : card.effect === "angel-snipe" ? "相手リーダーまたはフォロワーに1ダメージ"
+    : card.effect === "death-dance" ? "相手のフォロワーを破壊し、リーダーに2ダメージ"
+    : card.effect === "reonidas" ? "攻撃時：相手全体に1ダメージ"
     : "ファンタジーの力を解き放て！";
 
   return `<div class="card ${selected ? "selected" : ""} ${ready ? "ready" : ""}">
@@ -281,7 +254,7 @@ function cardMarkup(card, side) {
       <button ${!myTurn() || !ready ? "disabled" : ""} onclick="selectAttacker('${card.id}')">攻撃</button>
       <button ${!myTurn() || !game || game.me.evo <= 0 || game.me.turns < 2 || card.evolved ? "disabled" : ""} onclick="evolve('${card.id}')">進化</button>
     </div>` : ""}
-    ${side === "enemy" && attackerId ? `<div class="card-actions"><button onclick="attack('${card.id}')">攻撃対象</button></div>` : ""}
+    ${side === "enemy" && (attackerId || pendingSpellTarget) ? `<div class="card-actions"><button onclick="${attackerId ? `attack('${card.id}')` : `selectSpellTarget('${card.id}')`}">${attackerId ? "攻撃対象" : "対象選択"}</button></div>` : ""}
   </div>`;
 }
 
@@ -310,6 +283,9 @@ function renderEffectPreview() {
     : card.effect === "heal4" ? "自分を4回復"
     : card.effect === "meteor" ? "敵リーダーに4ダメージ"
     : card.effect === "draw" ? "カードを2枚引く"
+    : card.effect === "angel-snipe" ? "相手リーダーまたはフォロワーに1ダメージ"
+    : card.effect === "death-dance" ? "相手のフォロワーを破壊し、リーダーに2ダメージ"
+    : card.effect === "reonidas" ? "攻撃時：相手全体に1ダメージ"
     : card.type === "follower" ? `${card.name}は戦場に出て攻撃できるフォロワーです。`
     : `${card.name}は戦術カードです。`;
 
@@ -342,14 +318,15 @@ function render() {
 
   const isDeckBuilding = game.phase === "deck-building" && !game.started;
   const canTargetLeader = !!attackerId && game?.enemy && game.enemy.field.length === 0 && myTurn();
+  const canTargetLeaderForSpell = !!pendingSpellTarget && game?.enemy && myTurn();
 
   renderEffectPreview();
 
   $("roomCode").textContent = game.code;
   $("lobby").style.display = game.started ? "none" : "block";
   $("deckBuilder").style.display = isDeckBuilding ? "block" : "none";
-  $("enemyLeaderTarget").style.display = canTargetLeader ? "inline-flex" : "none";
-  $("enemyLeaderTarget").disabled = !canTargetLeader;
+  $("enemyLeaderTarget").style.display = canTargetLeader || canTargetLeaderForSpell ? "inline-flex" : "none";
+  $("enemyLeaderTarget").disabled = !(canTargetLeader || canTargetLeaderForSpell);
 
   const resultBanner = $("battleResultBanner");
   if (resultBanner) {
@@ -374,11 +351,13 @@ function render() {
   $("myHp").textContent = game.me.hp + " HP";
   $("myMana").textContent = `マナ ${game.me.mana} / ${game.me.maxMana}`;
   $("myEvo").textContent = `進化ポイント ${game.me.evo}`;
+  $("myHandCount").textContent = `手札 ${game.me.hand.length} 枚`;
   $("deckCount").textContent = `デッキ残り ${game.me.deckCount} 枚`;
 
   $("enemyName").textContent = game.enemy?.name || "対戦相手を待っています";
   $("enemyHp").textContent = game.enemy ? game.enemy.hp + " HP" : "-- HP";
   $("enemyMana").textContent = game.enemy ? `マナ ${game.enemy.mana} / ${game.enemy.maxMana}` : "マナ --";
+  $("enemyEvo").textContent = game.enemy ? `進化ポイント ${game.enemy.evo}` : "進化 0";
   $("enemyHand").textContent = game.enemy ? `手札 ${game.enemy.handCount} 枚` : "手札 -- 枚";
 
   $("myField").innerHTML = game.me.field.length
@@ -419,26 +398,47 @@ function render() {
 function previewCard(index) {
   if (!myTurn()) return;
   selectedCardPreviewIndex = index;
+  audioManager.playEffect("/audio/cardtap1.mp3", 0.45);
   renderEffectPreview();
   render();
 }
 
 function confirmSelectedCardUse() {
   if (selectedCardPreviewIndex === null) return;
+  const card = getSelectedPreviewCard();
+  if (!card) return;
+
+  if (["angel-snipe", "death-dance"].includes(card.effect)) {
+    pendingSpellTarget = { index: selectedCardPreviewIndex };
+    const enemyHasField = !!(game?.enemy && game.enemy.field.length > 0);
+    $("notice").textContent = card.effect === "death-dance"
+      ? (enemyHasField ? "相手のフォロワーを選択してください。" : "死の舞踏は相手のフォロワーがいるときに使えます。")
+      : "相手リーダーまたはフォロワーを選択してください。";
+    selectedCardPreviewIndex = null;
+    render();
+    return;
+  }
+
   if (myTurn()) {
-    const card = game.me.hand[selectedCardPreviewIndex];
-    if (card) audioManager.playEffect(card.type === "spell" ? "/audio/spellcard1.mp3" : "/audio/cardput1.mp3", 0.7);
     socket.emit("playCard", { index: selectedCardPreviewIndex });
   }
+  selectedCardPreviewIndex = null;
+  pendingSpellTarget = null;
+  render();
+}
+
+function selectSpellTarget(targetId) {
+  if (!pendingSpellTarget) return;
+  if (!myTurn()) return;
+  socket.emit("playCard", { index: pendingSpellTarget.index, targetId });
+  pendingSpellTarget = null;
   selectedCardPreviewIndex = null;
   render();
 }
 
-function playCard(index) {
+function playCard(index, targetId = null) {
   if (!myTurn()) return;
-  const card = game.me.hand[index];
-  if (card) audioManager.playEffect(card.type === "spell" ? "/audio/spellcard1.mp3" : "/audio/cardput1.mp3", 0.7);
-  socket.emit("playCard", { index });
+  socket.emit("playCard", { index, targetId });
 }
 
 function selectAttacker(id) {
@@ -454,7 +454,6 @@ function selectAttacker(id) {
 
 function attack(targetId) {
   if (!myTurn() || !attackerId) return;
-  audioManager.playEffect("/audio/dagekiAttack1.mp3", 0.8);
   socket.emit("attack", { attackerId, targetId });
   attackerId = null;
 }
@@ -472,7 +471,6 @@ function cancelAttack() {
 function endTurn() {
   attackerId = null;
   if (myTurn()) {
-    audioManager.playEffect("/audio/cardtap1.mp3", 0.45);
     socket.emit("endTurn");
   }
 }
@@ -514,9 +512,17 @@ window.submitDeck = submitDeck;
 
 $("enemyHp").parentElement.style.cursor = "pointer";
 $("enemyHp").parentElement.onclick = () => {
-  if (attackerId && game?.enemy?.field.length === 0) attack("leader");
+if (pendingSpellTarget) {
+      selectSpellTarget("leader");
+      return;
+    }
+    if (attackerId && game?.enemy?.field.length === 0) attack("leader");
 };
 $("enemyLeaderTarget").onclick = () => {
+  if (pendingSpellTarget) {
+    selectSpellTarget("leader");
+    return;
+  }
   if (attackerId && game?.enemy?.field.length === 0) attack("leader");
 };
 

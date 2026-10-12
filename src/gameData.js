@@ -14,7 +14,12 @@ const CARDS = [
   { id: "soul-pact", name: "魂の契約", cost: 3, icon: "💠", image: "/images/cards/drow.jpeg", type: "spell", effect: "draw" },
   { id: "awakening-dragon", name: "覚醒の竜", cost: 7, atk: 7, hp: 7, icon: "🐲", image: "/images/cards/dragon.jpeg", type: "follower", effect: "heal3" },
   { id: "zeus", name: "ゼウス", cost: 10, atk: 10, hp: 10, icon: "⚡", image: "/images/cards/zeus.jpg", type: "follower", effect: "zeus" },
-  { id: "demon_hand", name: "大悪魔の腕", cost: 6, icon: "👿", image: "/images/cards/demon_hand.jpg", type: "spell", effect: "demon-hand" }
+  { id: "demon_hand", name: "大悪魔の腕", cost: 6, icon: "👿", image: "/images/cards/demon_hand.jpg", type: "spell", effect: "demon-hand" },
+  { id: "bell_engel", name: "鐘の天使", cost: 2, atk: 1, hp: 5,icon: "👼", image: "/images/cards/bell_engel.jpg", type: "follower"},
+  { id: "engel_snipe", name: "天使の狙撃", cost: 1, icon: "🏹", image: "/images/cards/engel_snipe.jpg", type: "spell", effect: "angel-snipe" },
+  { id: "dethe_dance", name: "死の舞踏", cost: 7, icon: "💃", image: "/images/cards/dethe_dance.jpg", type: "spell", effect: "death-dance" },
+  { id: "reonidas", name: "レオニダス", cost: 8, atk: 7, hp: 8, icon: "🤴", image: "/images/cards/reonidas.jpg", type: "follower", effect: "reonidas" }
+
 ];
 
 function shuffle(deck) {

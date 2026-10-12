@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Card Effect Demo</title>
+    <style>
+      :root {
+        --bg: #0b1020;
+        --panel: rgba(20, 26, 44, 0.9);
+        --gold: #f4d58b;
+        --red: #ff6b6b;
+        --blue: #67d0ff;
+        --green: #9effc6;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        font-family: "Segoe UI", sans-serif;
+        background: radial-gradient(circle at top, #253867, #0b1020 60%);
+        color: #f5f7ff;
+      }
+
+      .demo {
+        width: min(920px, 92vw);
+        padding: 24px;
+        border-radius: 18px;
+        background: var(--panel);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+      }
+
+      h2 {
+        margin: 0 0 16px;
+        letter-spacing: 0.08em;
+        color: var(--gold);
+      }
+
+      .battle-field {
+        position: relative;
+        width: 100%;
+        height: 320px;
+        border-radius: 16px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background-image:
+          linear-gradient(rgba(7, 11, 20, 0.2), rgba(7, 11, 20, 0.45)),
+          url('/images/batle_field.png');
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+      }
+
+      .card-slot {
+        position: absolute;
+        left: 50%;
+        top: 56%;
+        transform: translate(-50%, -50%);
+        width: 130px;
+        height: 170px;
+        border-radius: 15px;
+        border: 2px solid rgba(255, 255, 255, 0.26);
+        background: linear-gradient(155deg, #3e4d7a, #18233d 70%);
+        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.3);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: 10px;
+      }
+
+      .card-slot .art {
+        height: 72px;
+        border-radius: 8px;
+        display: grid;
+        place-items: center;
+        font-size: 30px;
+        background: radial-gradient(circle, #6e88ff, #1d2947 70%);
+      }
+
+      .card-slot .name {
+        font-weight: 800;
+        font-size: 13px;
+      }
+
+      .card-slot .stats {
+        display: flex;
+        justify-content: space-between;
+        font-weight: 900;
+        font-size: 14px;
+      }
+
+      .summon {
+        animation: summonBounce 0.8s ease-out;
+      }
+
+      @keyframes summonBounce {
+        0% { transform: translate(-50%, -50%) scale(0.7); filter: brightness(1.5); }
+        35% { transform: translate(-50%, -58%) scale(1.08); }
+        100% { transform: translate(-50%, -50%) scale(1); }
+      }
+
+      .summon-ring {
+        position: absolute;
+        left: 50%;
+        top: 56%;
+        width: 180px;
+        height: 180px;
+        transform: translate(-50%, -50%);
+        border-radius: 50%;
+        border: 4px solid rgba(125, 218, 255, 0.9);
+        box-shadow: 0 0 18px rgba(125, 218, 255, 0.9), 0 0 36px rgba(125, 218, 255, 0.4);
+        animation: summonRing 0.8s ease-out forwards;
+        pointer-events: none;
+      }
+
+      @keyframes summonRing {
+        0% {
+          opacity: 0;
+          transform: translate(-50%, -50%) scale(0.3);
+        }
+        25% {
+          opacity: 1;
+        }
+        100% {
+          opacity: 0;
+          transform: translate(-50%, -50%) scale(1.6);
+        }
+      }
+
+      .damage-pop {
+        position: absolute;
+        left: 50%;
+        top: 42%;
+        transform: translate(-50%, 0);
+        font-size: 36px;
+        font-weight: 900;
+        color: var(--red);
+        text-shadow: 0 0 12px rgba(255, 107, 107, 0.8);
+        animation: damageFloat 0.9s ease-out forwards;
+        pointer-events: none;
+      }
+
+      @keyframes damageFloat {
+        0% {
+          opacity: 0;
+          transform: translate(-50%, 0) scale(0.7);
+        }
+        20% {
+          opacity: 1;
+        }
+        100% {
+          opacity: 0;
+          transform: translate(-50%, -80px) scale(1.2);
+        }
+      }
+
+      .destroyed {
+        animation: destroyedCard 0.7s ease-out forwards;
+      }
+
+      @keyframes destroyedCard {
+        0% { filter: brightness(1); opacity: 1; }
+        35% { filter: brightness(1.8) sepia(1) saturate(1.5); }
+        100% { filter: grayscale(1) brightness(0.3); opacity: 0.2; transform: scale(0.86); }
+      }
+
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        margin-top: 18px;
+      }
+
+      button {
+        border: 0;
+        border-radius: 10px;
+        padding: 10px 18px;
+        font-size: 14px;
+        font-weight: 800;
+        color: #fff;
+        cursor: pointer;
+        background: linear-gradient(135deg, #5f7cff, #2d3d8a);
+      }
+
+      button.secondary {
+        background: linear-gradient(135deg, #f2a65a, #c76d32);
+      }
+
+      button.danger {
+        background: linear-gradient(135deg, #ff7f7f, #b93d4d);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="demo">
+      <h2>Card Effect Sample</h2>
+
+      <div class="battle-field" id="battleField">
+        <div class="card-slot" id="targetCard">
+          <div class="art">⚡</div>
+          <div class="name">Zeus</div>
+          <div class="stats"><span>ATK 5</span><span>HP 4</span></div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button id="summonBtn">召喚エフェクト</button>
+        <button id="attackBtn" class="secondary">ダメージエフェクト</button>
+        <button id="destroyBtn" class="danger">消滅エフェクト</button>
+      </div>
+    </div>
+
+    <script>
+      const battleField = document.getElementById('battleField');
+      const targetCard = document.getElementById('targetCard');
+
+      document.getElementById('summonBtn').addEventListener('click', () => {
+        const ring = document.createElement('div');
+        ring.className = 'summon-ring';
+        battleField.appendChild(ring);
+
+        targetCard.classList.remove('summon');
+        void targetCard.offsetWidth;
+        targetCard.classList.add('summon');
+
+        setTimeout(() => ring.remove(), 800);
+      });
+
+      document.getElementById('attackBtn').addEventListener('click', () => {
+        const damage = document.createElement('div');
+        damage.className = 'damage-pop';
+        damage.textContent = '-5';
+        battleField.appendChild(damage);
+        setTimeout(() => damage.remove(), 900);
+      });
+
+      document.getElementById('destroyBtn').addEventListener('click', () => {
+        targetCard.classList.remove('destroyed');
+        void targetCard.offsetWidth;
+        targetCard.classList.add('destroyed');
+      });
+    </script>
+  </body>
+</html>

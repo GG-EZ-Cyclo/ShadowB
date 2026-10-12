@@ -1,6 +1,10 @@
 function resolveAttack(attacker, target) {
-  const targetDamage = Number(attacker?.atk ?? 0);
+  let targetDamage = Number(attacker?.atk ?? 0);
   const attackerDamage = Number(target?.atk ?? 0);
+
+  if (attacker?.effect === "reonidas") {
+    targetDamage += 1;
+  }
 
   return {
     targetDamage,

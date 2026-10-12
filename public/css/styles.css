@@ -22,9 +22,10 @@ body.mobile-device.need-landscape header{opacity:.2}
 .small{font-size:12px;color:var(--muted)}
 .ready-row{justify-content:flex-start;margin:8px 0 10px}
 .ready-status{padding:6px 10px;border-radius:999px;background:#1f2945;border:1px solid #475d9a;color:#dfe9ff;font-size:11px;font-weight:700}
+#battleArea{position:relative;overflow:hidden;border-radius:18px;border:1px solid rgba(255,255,255,.12);background-image:linear-gradient(rgba(9,12,20,.38),rgba(9,12,20,.54)),url('/images/batle_field.png');background-size:cover;background-position:center;background-repeat:no-repeat;box-shadow:inset 0 0 40px rgba(0,0,0,.35);padding:14px;}
 .battle-layout{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(260px,.9fr);gap:14px;align-items:start}
-.battle-panel{min-width:0}
-.effect-panel{min-height:240px}
+.battle-panel{min-width:0;background:rgba(20,26,44,.22);backdrop-filter:blur(1px)}
+.effect-panel{min-height:240px;background:rgba(20,26,44,.28);backdrop-filter:blur(1px);border:1px solid rgba(255,255,255,.08)}
 .effect-preview{display:flex;flex-direction:column;gap:12px;min-height:220px;padding:8px 4px}
 .effect-preview.empty{display:grid;place-items:center;color:var(--muted);font-size:13px;border:1px dashed rgba(255,255,255,.15);border-radius:12px;background:rgba(255,255,255,.02)}
 .effect-card{display:flex;flex-direction:column;gap:10px;padding:10px;border-radius:12px;background:linear-gradient(145deg,#1d2940,#111827);border:1px solid rgba(255,255,255,.08)}
@@ -38,6 +39,8 @@ body.mobile-device.need-landscape header{opacity:.2}
 .hp{color:#ff9fb6;font-size:22px;font-weight:900}
 .mana{color:#91d7ff;font-weight:800}
 .field,.hand,.deck-library{display:flex;justify-content:center;align-items:stretch;gap:9px;flex-wrap:wrap;padding:13px 0;min-height:100px}
+.field{position:relative;overflow:hidden;border-radius:12px;border:1px solid rgba(255,255,255,.12);background:rgba(17,22,34,.18);box-shadow:inset 0 0 12px rgba(0,0,0,.2)}
+.field::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(0,0,0,.12));pointer-events:none}
 .hand{justify-content:flex-start;overflow-x:auto;flex-wrap:nowrap;min-height:185px}
 .deck-library{justify-content:flex-start;gap:12px}
 .deck-card{position:relative;display:flex;flex-direction:column;justify-content:space-between;text-align:left;flex:0 0 170px;min-height:170px;background:linear-gradient(155deg,#35466e,#171f37 75%);border:1px solid #6d7fa5;border-radius:11px;padding:9px;white-space:normal}
