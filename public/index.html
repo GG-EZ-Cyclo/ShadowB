@@ -32,59 +32,95 @@
     <p class="small">ホストがルームを作成し、表示されたコードを友達に共有してください。</p>
   </section>
 
+  <section class="panel" id="deckBuilder" style="display:none;">
+    <div class="row">
+      <h3>デッキ構築</h3>
+      <span class="small" id="deckSummary">0 / 20 枚</span>
+    </div>
+    <div class="row ready-row">
+      <div class="ready-status" id="deckReadyStatus">自分: 準備中</div>
+      <div class="ready-status" id="enemyReadyStatus">相手: 待機中</div>
+    </div>
+    <div id="deckLibrary" class="deck-library"></div>
+    <div class="row" style="justify-content:center;margin-top:12px;">
+      <button id="submitDeckBtn" class="gold" onclick="submitDeck()">このデッキで対戦開始</button>
+    </div>
+  </section>
+
   <section class="panel">
     <div class="row">
       <div><span class="small">ROOM CODE</span><div id="roomCode">------</div></div>
       <div id="turn" class="small">対戦相手を待っています</div>
     </div>
+    <div id="battleResultBanner" class="battle-result hidden" aria-live="polite"></div>
     <p id="notice">ルームを作成するか、友達のルームに参加してください。</p>
   </section>
 
-  <section class="panel">
-    <div class="row">
-      <div>
-        <div class="small">ENEMY LEADER</div>
-        <strong id="enemyName">対戦相手</strong>
-        <div class="hp" id="enemyHp">-- HP</div>
-      </div>
-      <div class="mana" id="enemyMana">マナ --</div>
-      <div class="small" id="enemyHand">手札 -- 枚</div>
+  <div id="orientationOverlay" class="orientation-overlay" aria-live="polite">
+    <div class="orientation-card">
+      <div class="orientation-icon">📱↔️</div>
+      <h3>横画面でプレイしてください</h3>
+      <p>スマホでは横向きにした状態で遊ぶ必要があります。<br>端末を横向きにして、画面を広く使ってください。</p>
     </div>
-    <hr>
-    <div class="small">ENEMY FIELD</div>
-    <div id="enemyField" class="field"></div>
-    <hr>
-    <div class="small">YOUR FIELD</div>
-    <div id="myField" class="field"></div>
-    <div class="row">
-      <div>
-        <div class="small">YOUR LEADER</div>
-        <strong id="myName">あなた</strong>
-        <div class="hp" id="myHp">20 HP</div>
-      </div>
-      <div>
-        <div class="mana" id="myMana">マナ 0 / 0</div>
-        <div class="small" id="myEvo">進化 2</div>
-      </div>
-    </div>
-    <div class="row" style="justify-content:center;margin-top:12px">
-      <button onclick="cancelAttack()">選択解除</button>
-      <button class="gold" id="end" onclick="endTurn()">ターン終了 ➜</button>
-    </div>
-  </section>
+  </div>
 
-  <section class="panel">
+  <div id="battleArea" class="battle-layout">
+    <section class="panel battle-panel">
+      <div class="row">
+        <div>
+          <div class="small">ENEMY LEADER</div>
+          <strong id="enemyName">対戦相手</strong>
+          <div class="hp" id="enemyHp">-- HP</div>
+          <button id="enemyLeaderTarget" class="small-target" style="display:none; margin-top:8px;" type="button">敵リーダーへ攻撃</button>
+        </div>
+        <div class="mana" id="enemyMana">マナ --</div>
+        <div class="small" id="enemyHand">手札 -- 枚</div>
+      </div>
+      <hr>
+      <div class="small">ENEMY FIELD</div>
+      <div id="enemyField" class="field"></div>
+      <hr>
+      <div class="small">YOUR FIELD</div>
+      <div id="myField" class="field"></div>
+      <div class="row">
+        <div>
+          <div class="small">YOUR LEADER</div>
+          <strong id="myName">あなた</strong>
+          <div class="hp" id="myHp">20 HP</div>
+        </div>
+        <div>
+          <div class="mana" id="myMana">マナ 0 / 0</div>
+          <div class="small" id="myEvo">進化 2</div>
+        </div>
+      </div>
+      <div class="row" style="justify-content:center;margin-top:12px">
+        <button onclick="cancelAttack()">選択解除</button>
+        <button class="gold" id="end" onclick="endTurn()">ターン終了 ➜</button>
+      </div>
+    </section>
+
+    <aside class="panel effect-panel" id="effectPreviewPanel">
+      <div class="small">CARD EFFECT</div>
+      <div id="effectPreview" class="effect-preview empty"></div>
+    </aside>
+  </div>
+
+  <section id="handArea" class="panel">
     <div class="row"><h3>YOUR HAND</h3><span class="small" id="deckCount"></span></div>
     <div id="hand" class="hand"></div>
-    <p class="small">カードを出すにはカードをクリック。攻撃するには自分のフォロワーを選び、対象をクリックします。</p>
+    <p class="small">カードを選ぶと効果の確認が右側に表示されます。確認後、使用ボタンで実行します。</p>
   </section>
 
   <section class="panel">
     <div class="small">BATTLE LOG</div>
     <div id="logs">戦いの記録がここに表示されます。</div>
+    <div id="postGameActions" class="row" style="display:none; justify-content:center; margin-top:12px;">
+      <button class="gold" onclick="requestRematch()">再戦</button>
+      <button onclick="leaveRoom()">終了</button>
+    </div>
+    <div id="postGameStatus" class="small" style="margin-top:8px;"></div>
   </section>
 </main>
-
-  <script src="/js/app.js" defer></script>
+<script src="/js/app.js" defer></script>
 </body>
 </html>

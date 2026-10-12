@@ -3,7 +3,9 @@ const http = require("http");
 const { Server } = require("socket.io");
 const crypto = require("crypto");
 const path = require("path");
-const { makeDeck } = require("./gameData");
+const { makeDeck, buildDeckFromSelection } = require("./gameData");
+const { applyFollowerSummonEffect, applySpellEffect } = require("./cardEffects");
+const { resolveAttack } = require("./attackLogic");
 
 const app = express();
 const server = http.createServer(app);
@@ -13,8 +15,9 @@ app.use(express.static(path.join(__dirname, "../public")));
 
 const rooms = new Map();
 
-function makePlayer(socket, name) {
-  const player = {
+function makePlayer(socket, name, deckSelection = null) {
+  const deck = deckSelection ? buildDeckFromSelection(deckSelection) : [];
+  return {
     socketId: socket.id,
     name: String(name || "旅人").slice(0, 16),
     hp: 20,
@@ -22,19 +25,27 @@ function makePlayer(socket, name) {
     maxMana: 0,
     evo: 2,
     turns: 0,
-    deck: makeDeck(),
+    deck,
     hand: [],
-    field: []
+    field: [],
+    deckReady: Boolean(deckSelection)
   };
-
-  for (let i = 0; i < 4; i++) draw(player);
-  return player;
 }
 
-function draw(player) {
-  if (player.deck.length > 0) {
-    player.hand.push(player.deck.pop());
+function draw(player, room = null) {
+  if (player.deck.length === 0) {
+    if (room) {
+      const loserIndex = room.players.findIndex(p => p.socketId === player.socketId);
+      const winnerIndex = loserIndex === 0 ? 1 : 0;
+      room.over = true;
+      room.winner = winnerIndex;
+      log(room, `${player.name}はデッキの21枚目を引き、敗北した。${room.players[winnerIndex].name}の勝利！`);
+    }
+    return false;
   }
+
+  player.hand.push(player.deck.pop());
+  return true;
 }
 
 function log(room, message) {
@@ -50,6 +61,7 @@ function publicCard(card) {
     atk: card.atk,
     hp: card.hp,
     icon: card.icon,
+    image: card.image || null,
     type: card.type,
     effect: card.effect,
     canAttack: card.canAttack,
@@ -62,13 +74,16 @@ function snapshot(room, index) {
   const enemy = room.players[1 - index];
 
   return {
+    phase: room.phase,
     code: room.code,
     started: room.started,
     over: room.over,
     winner: room.winner,
     active: room.active,
     turn: room.turn,
+    players: room.players.map(player => ({ name: player.name, socketId: player.socketId })),
     myIndex: index,
+    rematchVotes: room.rematchVotes ? room.rematchVotes.slice() : [],
     me: {
       name: me.name,
       hp: me.hp,
@@ -78,7 +93,8 @@ function snapshot(room, index) {
       turns: me.turns,
       hand: me.hand.map(publicCard),
       field: me.field.map(publicCard),
-      deckCount: me.deck.length
+      deckCount: me.deck.length,
+      deckReady: me.deckReady
     },
     enemy: enemy ? {
       name: enemy.name,
@@ -88,7 +104,8 @@ function snapshot(room, index) {
       evo: enemy.evo,
       handCount: enemy.hand.length,
       field: enemy.field.map(publicCard),
-      deckCount: enemy.deck.length
+      deckCount: enemy.deck.length,
+      deckReady: enemy.deckReady
     } : null,
     logs: room.logs
   };
@@ -131,10 +148,48 @@ function enemyOf(room, player) {
   return room.players.find(p => p !== player);
 }
 
-function startGame(room) {
-  room.started = true;
+function resetDeckBuilding(room) {
+  room.phase = "deck-building";
+  room.started = false;
+  room.over = false;
+  room.winner = null;
   room.active = 0;
   room.turn = 1;
+  room.rematchVotes = [];
+
+  room.players.forEach(player => {
+    player.hp = 20;
+    player.mana = 0;
+    player.maxMana = 0;
+    player.evo = 2;
+    player.turns = 0;
+    player.field = [];
+    player.hand = [];
+    player.deck = [];
+    player.deckReady = false;
+  });
+
+  log(room, "再戦のためにデッキ構築画面に戻りました。");
+}
+
+function startGame(room) {
+  room.started = true;
+  room.phase = "battle";
+  room.active = 0;
+  room.turn = 1;
+  room.rematchVotes = [];
+
+  room.players.forEach(player => {
+    player.hp = 20;
+    player.mana = 0;
+    player.maxMana = 0;
+    player.evo = 2;
+    player.turns = 0;
+    player.field = [];
+    player.hand = [];
+    if (!player.deck.length) player.deck = makeDeck();
+    for (let i = 0; i < 4; i++) draw(player, room);
+  });
 
   const first = room.players[0];
   first.maxMana = 1;
@@ -160,6 +215,8 @@ io.on("connection", socket => {
       winner: null,
       active: 0,
       turn: 1,
+      phase: "deck-building",
+      rematchVotes: [],
       logs: []
     };
 
@@ -168,7 +225,7 @@ io.on("connection", socket => {
     socket.data.roomCode = code;
 
     socket.emit("roomCreated", code);
-    log(room, "ルームを作成しました。友達の参加を待っています。");
+    log(room, "ルームを作成しました。デッキを構築して対戦相手を待ってください。");
     publish(room);
   });
 
@@ -186,7 +243,99 @@ io.on("connection", socket => {
     socket.data.roomCode = code;
 
     log(room, "対戦相手が参加しました！");
-    startGame(room);
+    publish(room);
+  });
+
+  socket.on("setDeck", ({ deck } = {}) => {
+    const room = getRoom(socket);
+    if (!room) return reject(socket, "ルームが見つかりません。");
+
+    const player = room.players.find(p => p.socketId === socket.id);
+    if (!player) return reject(socket, "プレイヤーが見つかりません。");
+
+    if (!Array.isArray(deck) || deck.length !== 20) {
+      return reject(socket, "デッキは20枚で組んでください。");
+    }
+
+    const builtDeck = buildDeckFromSelection(deck);
+    if (!builtDeck.length) {
+      return reject(socket, "デッキの構成が無効です。重複は2枚までで組んでください。");
+    }
+
+    player.deck = builtDeck;
+    player.deckReady = true;
+    log(room, `${player.name}のデッキを構築しました。`);
+
+    if (room.players.length === 2 && room.players.every(p => p.deckReady)) {
+      startGame(room);
+      return;
+    }
+
+    publish(room);
+  });
+
+  socket.on("requestRematch", () => {
+    const room = getRoom(socket);
+    if (!room) return reject(socket, "ルームが見つかりません。");
+    if (!room.over) return reject(socket, "決着後にだけ再戦できます。");
+
+    if (!room.rematchVotes.includes(socket.id)) {
+      room.rematchVotes.push(socket.id);
+    }
+
+    if (room.rematchVotes.length >= room.players.length) {
+      resetDeckBuilding(room);
+      publish(room);
+      return;
+    }
+
+    log(room, `${room.players.find(p => p.socketId === socket.id)?.name || "相手"}が再戦を希望しました。`);
+    publish(room);
+  });
+
+  socket.on("leaveRoom", () => {
+    const room = getRoom(socket);
+    if (!room) {
+      socket.emit("roomLeft", { self: true, message: "ホームに戻りました。" });
+      return;
+    }
+
+    const leavingPlayer = room.players.find(player => player.socketId === socket.id);
+    const remainingPlayers = room.players.filter(player => player.socketId !== socket.id);
+
+    socket.leave(room.code);
+    socket.data.roomCode = null;
+
+    room.players = remainingPlayers;
+    room.rematchVotes = room.rematchVotes.filter(id => room.players.some(player => player.socketId === id));
+
+    if (room.players.length === 0) {
+      rooms.delete(room.code);
+      socket.emit("roomLeft", { self: true, message: "ホームに戻りました。" });
+      return;
+    }
+
+    if (room.players.length === 1) {
+      room.started = false;
+      room.over = false;
+      room.phase = "deck-building";
+      room.winner = null;
+      room.active = 0;
+      room.turn = 1;
+      room.logs = ["対戦相手が退出したため、デッキ構築に戻りました。"];
+    }
+
+    if (leavingPlayer) {
+      socket.emit("roomLeft", { self: true, message: "ホームに戻りました。対戦を終了しました。" });
+    }
+    if (room.players[0]) {
+      io.to(room.players[0].socketId).emit("roomLeft", {
+        self: false,
+        message: "対戦相手が終了を選択したためホームに戻ります。"
+      });
+    }
+
+    publish(room);
   });
 
   socket.on("playCard", ({ index } = {}) => {
@@ -208,15 +357,14 @@ io.on("connection", socket => {
 
     if (card.type === "follower") {
       player.field.push({ ...card, canAttack: false });
-
-      if (card.effect === "heal") player.hp = Math.min(20, player.hp + 2);
-      if (card.effect === "heal3") player.hp = Math.min(20, player.hp + 3);
-      if (card.effect === "blast") enemy.hp -= 2;
-
-      log(room, `${player.name}は${card.name}を召喚！`);
+      applyFollowerSummonEffect(card, player, enemy);
+      if (card.effect === "zeus") {
+        log(room, `${player.name}は${card.name}を召喚！ 敵リーダーと全ての敵フォロワーに5ダメージ。`);
+      } else {
+        log(room, `${player.name}は${card.name}を召喚！`);
+      }
     } else {
-      if (card.effect === "heal4") player.hp = Math.min(20, player.hp + 4);
-      if (card.effect === "meteor") enemy.hp -= 4;
+      applySpellEffect(card, player, enemy);
 
       if (card.effect === "bolt") {
         if (enemy.field.length) {
@@ -228,9 +376,15 @@ io.on("connection", socket => {
           enemy.hp -= 3;
           log(room, `${player.name}の雷撃！ 敵リーダーに3ダメージ。`);
         }
+      } else if (card.effect === "demon-hand") {
+        log(room, `${player.name}の大悪魔の腕！ 相手の場のフォロワー全体に4ダメージ。`);
       } else if (card.effect === "draw") {
-        draw(player);
-        draw(player);
+        draw(player, room);
+        draw(player, room);
+        if (room.over) {
+          publish(room);
+          return;
+        }
         log(room, `${player.name}は魂の契約を使用。2枚引いた。`);
       } else {
         log(room, `${player.name}は${card.name}を使用！`);
@@ -264,13 +418,14 @@ io.on("connection", socket => {
       const target = enemy.field.find(f => f.id === targetId);
       if (!target) return reject(socket, "攻撃対象が見つかりません。");
 
-      target.hp -= attacker.atk;
-      attacker.hp -= target.atk;
+      const attack = resolveAttack(attacker, target);
+      target.hp -= attack.targetDamage;
+      attacker.hp -= attack.attackerDamage;
 
       enemy.field = enemy.field.filter(f => f.hp > 0);
       player.field = player.field.filter(f => f.hp > 0);
 
-      log(room, `${attacker.name}と${target.name}が交戦！`);
+      log(room, `${attacker.name}が${target.name}に${attack.targetDamage}ダメージ、反撃で${attack.attackerDamage}ダメージを受けた。`);
     }
 
     const stillAlive = player.field.find(f => f.id === attackerId);
@@ -314,7 +469,11 @@ io.on("connection", socket => {
     next.maxMana = Math.min(10, next.maxMana + 1);
     next.mana = next.maxMana;
     next.field.forEach(f => { f.canAttack = true; });
-    draw(next);
+    draw(next, room);
+    if (room.over) {
+      publish(room);
+      return;
+    }
 
     log(room, `${next.name}のターン！`);
     publish(room);
