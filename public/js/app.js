@@ -28,6 +28,51 @@ const esc = value => String(value ?? "").replace(/[&<>\"']/g, c => ({
   "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
 }[c]));
 
+const audioManager = (() => {
+  const homeBgm = new Audio("/audio/homeBGM1.mp3");
+  const battleBgm = new Audio("/audio/BattleBGM(Lowen).mp3");
+  let unlocked = false;
+  let active = "home";
+
+  [homeBgm, battleBgm].forEach(audio => {
+    audio.loop = true;
+    audio.preload = "auto";
+    audio.volume = 0.25;
+  });
+
+  function unlock() {
+    if (unlocked) return;
+    unlocked = true;
+    setBgm(active);
+  }
+
+  function setBgm(mode) {
+    active = mode;
+    const target = mode === "battle" ? battleBgm : homeBgm;
+    [homeBgm, battleBgm].forEach(audio => {
+      if (audio !== target) {
+        audio.pause();
+        audio.currentTime = 0;
+      }
+    });
+
+    if (!unlocked) return;
+    target.play().catch(() => {});
+  }
+
+  function playEffect(path, volume = 0.6) {
+    const audio = new Audio(path);
+    audio.volume = volume;
+    audio.preload = "auto";
+    audio.play().catch(() => {});
+  }
+
+  return { unlock, setBgm, playEffect };
+})();
+
+window.addEventListener("pointerdown", audioManager.unlock, { once: true });
+window.addEventListener("keydown", audioManager.unlock, { once: true });
+
 function getDeckArray() {
   const result = [];
   Object.entries(selectedDeck).forEach(([cardId, count]) => {
@@ -133,6 +178,14 @@ socket.on("notice", message => {
 socket.on("state", state => {
   game = state;
   attackerId = null;
+
+  if (!game || (!game.started && game.phase !== "battle")) {
+    audioManager.setBgm("home");
+  } else if (game.started && !game.over) {
+    audioManager.setBgm("battle");
+  } else if (!game.started || game.over) {
+    audioManager.setBgm("home");
+  }
 
   if (game?.phase === "deck-building" && !game.started) {
     selectedDeck = {};
@@ -372,13 +425,20 @@ function previewCard(index) {
 
 function confirmSelectedCardUse() {
   if (selectedCardPreviewIndex === null) return;
-  if (myTurn()) socket.emit("playCard", { index: selectedCardPreviewIndex });
+  if (myTurn()) {
+    const card = game.me.hand[selectedCardPreviewIndex];
+    if (card) audioManager.playEffect(card.type === "spell" ? "/audio/spellcard1.mp3" : "/audio/cardput1.mp3", 0.7);
+    socket.emit("playCard", { index: selectedCardPreviewIndex });
+  }
   selectedCardPreviewIndex = null;
   render();
 }
 
 function playCard(index) {
-  if (myTurn()) socket.emit("playCard", { index });
+  if (!myTurn()) return;
+  const card = game.me.hand[index];
+  if (card) audioManager.playEffect(card.type === "spell" ? "/audio/spellcard1.mp3" : "/audio/cardput1.mp3", 0.7);
+  socket.emit("playCard", { index });
 }
 
 function selectAttacker(id) {
@@ -394,6 +454,7 @@ function selectAttacker(id) {
 
 function attack(targetId) {
   if (!myTurn() || !attackerId) return;
+  audioManager.playEffect("/audio/dagekiAttack1.mp3", 0.8);
   socket.emit("attack", { attackerId, targetId });
   attackerId = null;
 }
@@ -410,7 +471,10 @@ function cancelAttack() {
 
 function endTurn() {
   attackerId = null;
-  if (myTurn()) socket.emit("endTurn");
+  if (myTurn()) {
+    audioManager.playEffect("/audio/cardtap1.mp3", 0.45);
+    socket.emit("endTurn");
+  }
 }
 
 function requestRematch() {
@@ -459,6 +523,7 @@ $("enemyLeaderTarget").onclick = () => {
 applyPhoneLandscapeLock();
 window.addEventListener("resize", applyPhoneLandscapeLock);
 window.addEventListener("orientationchange", applyPhoneLandscapeLock);
+audioManager.setBgm("home");
 showHomeScreen();
 renderDeckBuilder();
 render();
